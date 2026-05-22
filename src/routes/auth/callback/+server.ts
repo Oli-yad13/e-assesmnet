@@ -19,5 +19,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		throw redirect(303, `/signin?error=${encodeURIComponent(error.message)}`);
 	}
 
-	throw redirect(303, next);
+	// Route through /complete-profile — it'll either show the name form
+	// (for first-time OAuth users with NULL full_name) or immediately
+	// forward to `next` (if the profile is already filled).
+	throw redirect(303, `/complete-profile?next=${encodeURIComponent(next)}`);
 };
