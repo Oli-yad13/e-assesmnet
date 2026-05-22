@@ -32,7 +32,7 @@
 	</main>
 	<footer class="border-t border-slate-200 bg-white">
 		<div class="max-w-6xl mx-auto px-6 py-4 text-xs text-slate-500">
-			Benchmarked against OECD, AIM, and Venture Client Model frameworks · EIH × SLE
+			Benchmarked against OECD, AIM, and Venture Client Model frameworks · EIH × ALX
 		</div>
 	</footer>
 </div>
