@@ -1,8 +1,14 @@
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { admin, isMember } from '$lib/server/userdb';
 import { averageScores, DIMENSIONS, type AssessmentPayload } from '$lib/assessment';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	const { data: assessments } = await locals.supabase
+	if (!locals.user) throw redirect(303, '/signin');
+	if (!(await isMember(params.orgId, locals.user.id))) throw error(404, 'Not a member.');
+
+	const sb = admin();
+	const { data: assessments } = await sb
 		.from('assessments')
 		.select('id, user_id, status, scores, diagnostics, submitted_at')
 		.eq('org_id', params.orgId)
@@ -12,7 +18,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	const userIds = [...new Set(submitted.map((a) => a.user_id))];
 	const { data: profiles } = userIds.length
-		? await locals.supabase.from('profiles').select('id, full_name').in('id', userIds)
+		? await sb.from('profiles').select('id, full_name').in('id', userIds)
 		: { data: [] as { id: string; full_name: string | null }[] };
 
 	const nameById: Record<string, string> = {};

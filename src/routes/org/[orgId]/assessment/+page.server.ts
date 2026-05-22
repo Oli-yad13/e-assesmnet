@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { admin, isMember } from '$lib/server/userdb';
 import { DIMENSIONS, type DiagnosticAnswer, type DiagnosticsByDim, type ScoresByDim } from '$lib/assessment';
 
 const ALLOWED_ANSWERS: DiagnosticAnswer[] = ['yes', 'partially', 'no'];
@@ -43,8 +44,10 @@ function isComplete(scores: ScoresByDim, diagnostics: DiagnosticsByDim): boolean
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) throw redirect(303, '/signin');
+	if (!(await isMember(params.orgId, locals.user.id))) throw error(404, 'Not a member.');
 
-	const { data: assessment, error: aErr } = await locals.supabase
+	const sb = admin();
+	const { data: assessment, error: aErr } = await sb
 		.from('assessments')
 		.select('*')
 		.eq('org_id', params.orgId)
@@ -54,7 +57,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	if (aErr) throw error(500, aErr.message);
 
 	if (!assessment) {
-		const { data: created, error: cErr } = await locals.supabase
+		const { data: created, error: cErr } = await sb
 			.from('assessments')
 			.insert({ org_id: params.orgId, user_id: locals.user.id, status: 'draft', scores: {}, diagnostics: {} })
 			.select('*')
@@ -69,8 +72,9 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 export const actions: Actions = {
 	save: async ({ request, locals, params }) => {
 		if (!locals.user) throw redirect(303, '/signin');
+		if (!(await isMember(params.orgId, locals.user.id))) throw error(403, 'Not a member.');
 		const { scores, diagnostics, notes } = parsePayload(await request.formData());
-		const { error: err } = await locals.supabase
+		const { error: err } = await admin()
 			.from('assessments')
 			.update({ scores, diagnostics, notes })
 			.eq('org_id', params.orgId)
@@ -81,11 +85,12 @@ export const actions: Actions = {
 	},
 	submit: async ({ request, locals, params }) => {
 		if (!locals.user) throw redirect(303, '/signin');
+		if (!(await isMember(params.orgId, locals.user.id))) throw error(403, 'Not a member.');
 		const { scores, diagnostics, notes } = parsePayload(await request.formData());
 		if (!isComplete(scores, diagnostics)) {
 			return fail(400, { error: 'All dimensions need a score and all diagnostic questions need an answer before you can submit.' });
 		}
-		const { error: err } = await locals.supabase
+		const { error: err } = await admin()
 			.from('assessments')
 			.update({ scores, diagnostics, notes, status: 'submitted', submitted_at: new Date().toISOString() })
 			.eq('org_id', params.orgId)

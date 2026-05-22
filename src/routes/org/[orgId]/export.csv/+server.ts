@@ -1,5 +1,6 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { admin, isMember } from '$lib/server/userdb';
 import { DIMENSIONS, averageScores, zoneFor, type AssessmentPayload } from '$lib/assessment';
 
 function esc(v: unknown): string {
@@ -9,10 +10,14 @@ function esc(v: unknown): string {
 }
 
 export const GET: RequestHandler = async ({ locals, params }) => {
-	const { data: org } = await locals.supabase.from('orgs').select('name').eq('id', params.orgId).maybeSingle();
+	if (!locals.user) throw redirect(303, '/signin');
+	if (!(await isMember(params.orgId, locals.user.id))) throw error(404, 'Not a member.');
+
+	const sb = admin();
+	const { data: org } = await sb.from('orgs').select('name').eq('id', params.orgId).maybeSingle();
 	if (!org) throw error(404, 'Not found');
 
-	const { data: rows } = await locals.supabase
+	const { data: rows } = await sb
 		.from('assessments')
 		.select('id, user_id, status, scores, diagnostics, submitted_at, updated_at, notes')
 		.eq('org_id', params.orgId);
@@ -21,7 +26,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	const userIds = [...new Set((rows ?? []).map((r: any) => r.user_id))];
 	const { data: profiles } = userIds.length
-		? await locals.supabase.from('profiles').select('id, full_name').in('id', userIds)
+		? await sb.from('profiles').select('id, full_name').in('id', userIds)
 		: { data: [] as { id: string; full_name: string | null }[] };
 	const nameById: Record<string, string> = {};
 	for (const p of profiles ?? []) nameById[p.id] = p.full_name ?? '';
@@ -60,7 +65,6 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		lines.push(cells.join(','));
 	}
 
-	// Aggregate row
 	const payloads: AssessmentPayload[] = submitted.map((a: any) => ({
 		scores: a.scores ?? {},
 		diagnostics: a.diagnostics ?? {}

@@ -1,15 +1,17 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { admin } from '$lib/server/userdb';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { data: memberships, error } = await locals.supabase
+	if (!locals.user) throw redirect(303, '/signin');
+
+	const { data: memberships, error } = await admin()
 		.from('org_members')
-		.select('role, org:orgs ( id, name, created_at )')
+		.select('role, joined_at, org:orgs ( id, name, created_at )')
+		.eq('user_id', locals.user.id)
 		.order('joined_at', { ascending: false });
 
-	if (error) {
-		return { orgs: [], error: error.message };
-	}
+	if (error) return { orgs: [], error: error.message };
 
 	const orgs = (memberships ?? [])
 		.map((m: any) => ({ ...m.org, role: m.role }))
@@ -25,7 +27,9 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) return fail(400, { error: 'Organisation name is required.' });
 
-		const { data: org, error: orgError } = await locals.supabase
+		const sb = admin();
+
+		const { data: org, error: orgError } = await sb
 			.from('orgs')
 			.insert({ name, created_by: locals.user.id })
 			.select('id')
@@ -33,7 +37,7 @@ export const actions: Actions = {
 
 		if (orgError || !org) return fail(400, { error: orgError?.message ?? 'Failed to create org.' });
 
-		const { error: memberError } = await locals.supabase
+		const { error: memberError } = await sb
 			.from('org_members')
 			.insert({ org_id: org.id, user_id: locals.user.id, role: 'owner' });
 
