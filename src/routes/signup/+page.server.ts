@@ -15,12 +15,22 @@ export const actions: Actions = {
 		if (!email || !password) return fail(400, { error: 'Email and password are required.', email });
 		if (password.length < 8) return fail(400, { error: 'Password must be at least 8 characters.', email });
 
-		const { error } = await locals.supabase.auth.signUp({
+		const { data, error } = await locals.supabase.auth.signUp({
 			email,
 			password,
 			options: { data: { full_name: fullName } }
 		});
 		if (error) return fail(400, { error: error.message, email });
+
+		// If "Confirm email" is enabled in Supabase, signUp succeeds but returns no session.
+		// We don't want that mode — surface a clear error so the operator turns it off.
+		if (!data.session) {
+			return fail(400, {
+				error:
+					'Account created but email confirmation is required. Disable "Confirm email" under Supabase → Auth → Providers → Email.',
+				email
+			});
+		}
 
 		const next = url.searchParams.get('next') ?? '/dashboard';
 		throw redirect(303, next);
