@@ -14,6 +14,9 @@
 			<nav class="flex items-center gap-4 text-sm">
 				{#if data?.user}
 					<a href="/dashboard" class="text-slate-700 hover:text-slate-900">Dashboard</a>
+					{#if data.isAdmin}
+						<a href="/admin" class="text-slate-700 hover:text-slate-900">Admin</a>
+					{/if}
 					<form action="/auth/signout" method="POST">
 						<button class="text-slate-500 hover:text-slate-900">Sign out</button>
 					</form>

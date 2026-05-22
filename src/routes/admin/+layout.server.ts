@@ -1,10 +1,9 @@
+import { error } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { isAdminEmail } from '$lib/server/admin';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
-	return {
-		session: locals.session,
-		user: locals.user,
-		isAdmin: isAdminEmail(locals.user?.email)
-	};
+	if (!isAdminEmail(locals.user?.email)) {
+		throw error(403, 'Admin access only.');
+	}
 };
