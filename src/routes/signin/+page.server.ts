@@ -1,8 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	if (locals.user) throw redirect(303, '/dashboard');
+	return { error: url.searchParams.get('error'), next: url.searchParams.get('next') ?? '/dashboard' };
 };
 
 export const actions: Actions = {
